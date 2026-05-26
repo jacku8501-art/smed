@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#1F3864">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="SMED MDC">
+<title>SMED Manager — MDC Confection</title>
+<link rel="manifest" href="manifest.json">
+<style>
+:root {
+  --bleu:#1F3864; --bleu2:#2E74B5; --bleu3:#D6E4F7;
+  --vert:#27AE60; --vert2:#E2EFDA;
+  --rouge:#E74C3C; --rouge2:#FCE4D6;
+  --jaune:#F39C12; --jaune2:#FFF2CC;
+  --gris:#F4F6F9; --gris2:#BDC3C7;
+  --blanc:#FFFFFF; --texte:#2C3E50;
+  --ombre:0 2px 12px rgba(0,0,0,0.10);
+  --radius:12px;
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;}
+body{font-family:'Segoe UI',Arial,sans-serif;background:var(--gris);color:var(--texte);min-height:100vh;overflow-x:hidden;}
+
+/* SETUP SCREEN */
+#setup-screen{
+  position:fixed;inset:0;background:linear-gradient(135deg,var(--bleu),var(--bleu2));
+  display:flex;align-items:center;justify-content:center;z-index:9999;padding:20px;
+}
+.setup-card{background:white;border-radius:20px;padding:28px;max-width:480px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,0.3);}
+.setup-card h1{color:var(--bleu);font-size:22px;margin-bottom:6px;}
+.setup-card p{color:#666;font-size:13px;margin-bottom:16px;line-height:1.6;}
+.setup-card textarea{width:100%;height:140px;border:2px solid #DDE3EC;border-radius:8px;padding:10px;font-family:monospace;font-size:12px;resize:none;}
+.setup-card textarea:focus{outline:none;border-color:var(--bleu2);}
+.step{background:var(--bleu3);border-radius:8px;padding:10px 14px;margin-bottom:10px;font-size:12px;line-height:1.6;}
+.step strong{color:var(--bleu);}
+
+/* LOADING */
+#loading-screen{
+  position:fixed;inset:0;background:var(--bleu);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:9998;
+  color:white;gap:16px;
+}
+.spinner{width:40px;height:40px;border:4px solid rgba(255,255,255,0.3);border-top-color:white;border-radius:50%;animation:spin 0.8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg);}}
+
+/* HEADER */
+header{
+  background:linear-gradient(135deg,var(--bleu),var(--bleu2));
+  color:white;padding:0 16px;
+  display:flex;align-items:center;justify-content:space-between;
+  height:56px;box-shadow:var(--ombre);position:sticky;top:0;z-index:100;
+}
+.logo{display:flex;align-items:center;gap:10px;}
+.logo h1{font-size:17px;font-weight:700;}
+.logo small{font-size:10px;opacity:0.8;display:block;}
+.header-icons{display:flex;align-items:center;gap:10px;}
+#sync-badge{font-size:11px;background:rgba(255,255,255,0.2);padding:3px 8px;border-radius:20px;}
+#sync-badge.online{background:rgba(39,174,96,0.5);}
+#sync-badge.offline{background:rgba(231,76,60,0.5);}
+
+/* BOTTOM NAV (mobile) */
+.bottom-nav{
+  position:fixed;bottom:0;left:0;right:0;
+  background:white;border-top:1px solid #DDE3EC;
+  display:flex;z-index:100;box-shadow:0 -2px 12px rgba(0,0,0,0.08);
+  padding-bottom:env(safe-area-inset-bottom);
+}
+.bottom-nav button{
+  flex:1;padding:10px 4px;border:none;background:none;cursor:pointer;
+  font-size:10px;font-weight:600;color:var(--gris2);
+  display:flex;flex-direction:column;align-items:center;gap:3px;transition:all 0.2s;
+}
+.bottom-nav button .icon{font-size:20px;}
+.bottom-nav button.active{color:var(--bleu);}
+.bottom-nav button.active .icon{transform:scale(1.15);}
+
+/* MAIN CONTENT */
+main{padding:16px;padding-bottom:80px;max-width:600px;margin:0 auto;}
+
+/* PAGES */
+.page{display:none;}
+.page.active{display:block;}
+
+/* CARDS */
+.card{background:var(--blanc);border-radius:var(--radius);padding:18px;box-shadow:var(--ombre);margin-bottom:14px;}
+.card h2{font-size:15px;color:var(--bleu);margin-bottom:14px;display:flex;align-items:center;gap:7px;border-bottom:2px solid var(--bleu3);padding-bottom:9px;}
+
+/* STATS */
+.stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:14px;}
+.stat-card{background:var(--blanc);border-radius:var(--radius);padding:16px;box-shadow:var(--ombre);text-align:center;border-top:4px solid var(--bleu2);}
+.stat-card.vert{border-top-color:var(--vert);}
+.stat-card.rouge{border-top-color:var(--rouge);}
+.stat-card.jaune{border-top-color:var(--jaune);}
+.stat-card .val{font-size:26px;font-weight:700;color:var(--bleu);}
+.stat-card.vert .val{color:var(--vert);}
+.stat-card.rouge .val{color:var(--rouge);}
+.stat-card.jaune .val{color:var(--jaune);}
+.stat-card .label{font-size:10px;color:#888;margin-top:3px;font-weight:600;text-transform:uppercase;letter-spacing:0.4px;}
+
+/* FORM */
+label{display:block;font-size:11px;font-weight:700;color:var(--bleu);margin-bottom:4px;text-transform:uppercase;letter-spacing:0.4px;}
+input,select,textarea{width:100%;padding:11px 12px;border:2px solid #DDE3EC;border-radius:8px;font-size:14px;color:var(--texte);transition:border-color 0.2s;background:var(--blanc);-webkit-appearance:none;}
+input:focus,select:focus,textarea:focus{outline:none;border-color:var(--bleu2);}
+.form-group{margin-bottom:12px;}
+
+/* BUTTONS */
+.btn{padding:11px 18px;border:none;border-radius:9px;cursor:pointer;font-size:14px;font-weight:700;transition:all 0.2s;display:inline-flex;align-items:center;justify-content:center;gap:7px;-webkit-appearance:none;}
+.btn-primary{background:var(--bleu);color:white;}
+.btn-success{background:var(--vert);color:white;}
+.btn-danger{background:var(--rouge);color:white;}
+.btn-warning{background:var(--jaune);color:white;}
+.btn-outline{background:none;border:2px solid var(--bleu2);color:var(--bleu2);}
+.btn-block{width:100%;margin-bottom:10px;}
+.btn-sm{padding:7px 12px;font-size:12px;}
+.btn:active{opacity:0.8;transform:scale(0.98);}
+.btn:disabled{opacity:0.5;}
+
+/* CHRONO */
+.chrono-box{background:var(--bleu);color:white;border-radius:16px;padding:24px 16px;text-align:center;margin-bottom:14px;}
+.chrono-display{font-size:52px;font-weight:700;font-family:'Courier New',monospace;letter-spacing:3px;margin:8px 0;}
+.chrono-label{font-size:11px;opacity:0.8;text-transform:uppercase;letter-spacing:1px;}
+.chrono-btns{display:flex;gap:10px;justify-content:center;margin-top:14px;}
+
+/* PHASE BAR */
+.phases{display:flex;gap:0;margin-bottom:14px;border-radius:9px;overflow:hidden;border:2px solid var(--bleu3);}
+.phase{flex:1;padding:8px 4px;text-align:center;font-size:9px;font-weight:700;background:var(--gris);color:#888;transition:all 0.3s;}
+.phase.active{background:var(--bleu);color:white;}
+.phase.done{background:var(--vert);color:white;}
+.phase .num{font-size:14px;display:block;margin-bottom:1px;}
+
+/* BADGES */
+.badge{display:inline-block;padding:3px 9px;border-radius:20px;font-size:10px;font-weight:700;}
+.badge-ied{background:var(--rouge2);color:var(--rouge);}
+.badge-oed{background:var(--vert2);color:var(--vert);}
+
+/* OP ITEM (mobile-friendly cards instead of table) */
+.op-item{background:var(--gris);border-radius:9px;padding:12px;margin-bottom:8px;display:flex;justify-content:space-between;align-items:flex-start;gap:8px;}
+.op-item .op-info{flex:1;}
+.op-item .op-info h4{font-size:13px;font-weight:700;color:var(--texte);}
+.op-item .op-info p{font-size:11px;color:#888;margin-top:2px;}
+.op-item .op-right{text-align:right;display:flex;flex-direction:column;align-items:flex-end;gap:5px;}
+.op-item .op-duree{font-size:16px;font-weight:700;color:var(--bleu2);}
+
+/* HISTORIQUE ITEMS */
+.hist-item{background:var(--blanc);border-radius:10px;padding:14px 16px;box-shadow:var(--ombre);margin-bottom:10px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;border-left:4px solid var(--bleu2);active:scale(0.99);}
+.hist-item:active{transform:scale(0.99);opacity:0.9;}
+.hist-item .info h3{font-size:14px;color:var(--bleu);font-weight:700;}
+.hist-item .info p{font-size:11px;color:#888;margin-top:2px;}
+.hist-item .meta .temps{font-size:20px;font-weight:700;color:var(--bleu2);}
+.hist-item .meta .date{font-size:10px;color:#aaa;text-align:right;}
+
+/* BILAN */
+.bilan-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px;}
+.bilan-chip{background:var(--gris);border-radius:8px;padding:8px 12px;flex:1;min-width:80px;text-align:center;}
+.bilan-chip .v{font-size:16px;font-weight:700;}
+.bilan-chip .l{font-size:10px;color:#888;}
+
+/* MODAL */
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.5);z-index:200;align-items:flex-end;justify-content:center;}
+.modal-overlay.open{display:flex;}
+.modal{background:white;border-radius:20px 20px 0 0;padding:24px;width:100%;max-height:90vh;overflow-y:auto;}
+.modal h2{color:var(--bleu);margin-bottom:16px;font-size:17px;}
+.modal-close{float:right;background:none;border:none;font-size:22px;cursor:pointer;color:#888;padding:0;}
+.modal-handle{width:40px;height:4px;background:#DDE3EC;border-radius:2px;margin:0 auto 16px;}
+
+/* PROGRESS */
+.progress-bar{background:#EEF0F5;border-radius:20px;height:8px;overflow:hidden;margin-top:6px;}
+.progress-fill{height:100%;border-radius:20px;background:linear-gradient(90deg,var(--bleu2),var(--vert));transition:width 0.5s;}
+
+/* EMPTY */
+.empty{text-align:center;padding:40px 20px;color:#aaa;}
+.empty .icon{font-size:40px;margin-bottom:10px;}
+.empty p{font-size:13px;}
+
+/* RAPPORT */
+.reco-item{border-radius:9px;padding:12px;margin-bottom:8px;font-size:13px;line-height:1.5;}
+
+/* INSTALL BANNER */
+#install-banner{display:none;background:var(--bleu2);color:white;padding:12px 16px;text-align:center;font-size:13px;cursor:pointer;}
+
+/* OFFLINE INDICATOR */
+#offline-bar{display:none;background:var(--rouge);color:white;text-align:center;font-size:12px;padding:6px;}
+
+.tip{font-size:11px;color:#999;margin-top:4px;font-style:italic;}
+.section-title{font-size:13px;font-weight:700;color:#888;text-transform:uppercase;letter-spacing:0.5px;margin:16px 0 10px;}
+</style>
+</head>
+<body>
+
+<!-- SETUP SCREEN -->
+<div id="setup-screen" style="display:none">
+  <div class="setup-card">
+    <h1>🏭 SMED MDC Confection</h1>
+    <p>Configuration initiale de Firebase pour la synchronisation en temps réel entre tous tes appareils.</p>
+
+    <div class="step">
+      <strong>Étape 1 :</strong> Va sur <strong>console.firebase.google.com</strong> → Créer un projet → Nom : <em>smed-mdc</em>
+    </div>
+    <div class="step">
+      <strong>Étape 2 :</strong> Dans ton projet → Paramètres ⚙️ → Tes applications → Ajouter une app Web (&lt;/&gt;)
+    </div>
+    <div class="step">
+      <strong>Étape 3 :</strong> Active <strong>Realtime Database</strong> → Règles → Colle : <code>{"rules":{".read":true,".write":true}}</code>
+    </div>
+    <div class="step">
+      <strong>Étape 4 :</strong> Dans les paramètres de ton app web Firebase → clique <strong>"Config"</strong> → copie <strong>tout le bloc</strong> qui commence par <code>const firebaseConfig = {</code> et colle-le ci-dessous 👇
+    </div>
+
+    <div class="form-group" style="margin-top:14px">
+      <label>Colle ta configuration Firebase ici</label>
+      <textarea id="firebase-config-input" placeholder='Colle ici ce que Firebase te donne.
+Les deux formats sont acceptés :
+
+Format JSON :
+{ "apiKey": "AIza...", "databaseURL": "https://..." }
+
+Format JavaScript (copié directement depuis Firebase) :
+const firebaseConfig = { apiKey: "AIza...", ... };'></textarea>
+    </div>
+    <button class="btn btn-primary btn-block" onclick="initFirebaseFromSetup()">✅ Connecter Firebase</button>
+    <p id="setup-error" style="color:var(--rouge);font-size:12px;margin-top:8px;display:none"></p>
+  </div>
+</div>
+
+<!-- LOADING SCREEN -->
+<div id="loading-screen">
+  <div class="spinner"></div>
+  <p>Connexion à Firebase...</p>
+</div>
+
+<!-- OFFLINE BAR -->
+<div id="offline-bar">📡 Hors ligne — Les données seront synchronisées à la reconnexion</div>
+
+<!-- INSTALL BANNER -->
+<div id="install-banner" onclick="installApp()">
+  📲 Installer l'application sur ton téléphone — Appuie ici !
+</div>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <span style="font-size:24px">🏭</span>
+    <div>
+      <h1>SMED Manager</h1>
+      <small>MDC Confection</small>
+    </div>
+  </div>
+  <div class="header-icons">
+    <span id="sync-badge" class="offline">● Hors ligne</span>
+    <button onclick="showPage('parametres')" style="background:none;border:none;color:white;font-size:20px;cursor:pointer">⚙️</button>
+  </div>
+</header>
+
+<!-- MAIN -->
+<main>
+
+  <!-- ══════════════════ DASHBOARD ══════════════════ -->
+  <div id="page-dashboard" class="page active">
+    <div class="stats-grid" id="stats-grid">
+      <div class="stat-card"><div class="val" id="s-total">0</div><div class="label">Changements</div></div>
+      <div class="stat-card vert"><div class="val" id="s-moy">--</div><div class="label">Moy. (min)</div></div>
+      <div class="stat-card rouge"><div class="val" id="s-max">--</div><div class="label">Max (min)</div></div>
+      <div class="stat-card jaune"><div class="val" id="s-gain">--%</div><div class="label">Gain SMED</div></div>
+    </div>
+
+    <div class="card">
+      <h2>🕐 Dernier changement</h2>
+      <div id="dernier-ch"><div class="empty"><div class="icon">📭</div><p>Aucun changement enregistré.</p></div></div>
+    </div>
+
+    <div class="card">
+      <h2>📊 Évolution des temps</h2>
+      <canvas id="chartEvo" height="140"></canvas>
+    </div>
+
+    <div class="card" style="margin-bottom:0">
+      <h2>⚙️ Répartition IED / OED</h2>
+      <div id="ied-oed-stats"><div class="empty"><p>Pas encore de données.</p></div></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════ NOUVEAU CHANGEMENT ══════════════════ -->
+  <div id="page-nouveau" class="page">
+
+    <div class="card">
+      <h2>📝 Informations</h2>
+      <div class="form-group"><label>Chaîne / Ligne</label><select id="f-chaine"><option value="">-- Sélectionner --</option></select></div>
+      <div class="form-group"><label>Machine</label><select id="f-machine"><option value="">-- Sélectionner --</option></select></div>
+      <div class="form-group"><label>Opérateur</label><select id="f-operateur"><option value="">-- Sélectionner --</option></select></div>
+      <div class="form-group"><label>Modèle avant</label><input type="text" id="f-avant" placeholder="ex: Pantalon A204"></div>
+      <div class="form-group"><label>Nouveau modèle</label><input type="text" id="f-apres" placeholder="ex: Pantalon B310"></div>
+    </div>
+
+    <div class="phases" id="phases-bar">
+      <div class="phase active" id="ph-0"><span class="num">①</span>Prép.</div>
+      <div class="phase" id="ph-1"><span class="num">②</span>Démont.</div>
+      <div class="phase" id="ph-2"><span class="num">③</span>Mont.</div>
+      <div class="phase" id="ph-3"><span class="num">④</span>Régl.</div>
+      <div class="phase" id="ph-4"><span class="num">⑤</span>Prod.</div>
+    </div>
+
+    <div class="chrono-box">
+      <div class="chrono-label">⏱ CHRONOMÈTRE GLOBAL</div>
+      <div class="chrono-display" id="chrono-global">00:00:00</div>
+      <div style="font-size:12px;opacity:0.8;margin-top:4px" id="chrono-status">Appuie sur Démarrer</div>
+      <div class="chrono-btns">
+        <button class="btn btn-success" id="btn-start" onclick="startChrono()">▶ Démarrer</button>
+        <button class="btn btn-warning" id="btn-pause" onclick="pauseChrono()" disabled>⏸ Pause</button>
+        <button class="btn btn-danger" id="btn-reset" onclick="resetChrono()" disabled>↺</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>➕ Ajouter une opération</h2>
+      <div class="form-group"><label>Description</label><input type="text" id="op-desc" placeholder="ex: Démonter le guide-fil"></div>
+      <div class="form-group"><label>Phase</label>
+        <select id="op-phase">
+          <option>Préparation</option><option>Démontage</option><option>Montage</option><option>Réglages</option><option>Production</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Type</label>
+        <select id="op-type">
+          <option value="IED">IED — Interne (machine arrêtée)</option>
+          <option value="OED">OED — Externe (machine en marche)</option>
+        </select>
+      </div>
+      <div class="form-group"><label>Durée (mm:ss)</label><input type="text" id="op-duree" placeholder="ex: 03:45" maxlength="5" inputmode="numeric"></div>
+      <div class="form-group"><label>Observation</label><input type="text" id="op-obs" placeholder="ex: Difficulté de vissage"></div>
+      <button class="btn btn-primary btn-block" onclick="ajouterOp()">+ Enregistrer l'opération</button>
+    </div>
+
+    <div class="card">
+      <h2>📋 Opérations <span id="ops-count" style="font-size:12px;font-weight:normal;color:#888"></span></h2>
+      <div id="ops-list"><div class="empty"><div class="icon">📝</div><p>Aucune opération.</p></div></div>
+      <div id="ops-bilan" style="display:none">
+        <div class="bilan-row">
+          <div class="bilan-chip"><div class="v" id="b-ied" style="color:var(--rouge)">0</div><div class="l">IED</div></div>
+          <div class="bilan-chip"><div class="v" id="b-oed" style="color:var(--vert)">0</div><div class="l">OED</div></div>
+          <div class="bilan-chip"><div class="v" id="b-total" style="color:var(--bleu)">0</div><div class="l">Total</div></div>
+        </div>
+        <div class="progress-bar" style="margin-top:10px"><div class="progress-fill" id="b-bar" style="width:0%"></div></div>
+        <p class="tip">% IED (réductible par SMED) : <span id="b-pct">0%</span></p>
+      </div>
+    </div>
+
+    <button class="btn btn-success btn-block" onclick="sauvegarder()">💾 Sauvegarder ce changement</button>
+    <button class="btn btn-outline btn-block" onclick="annuler()">✕ Annuler</button>
+  </div>
+
+  <!-- ══════════════════ HISTORIQUE ══════════════════ -->
+  <div id="page-historique" class="page">
+    <div style="margin-bottom:12px;display:flex;gap:8px">
+      <input type="text" id="hist-search" placeholder="🔍 Rechercher..." style="flex:1" oninput="filtrerHist()">
+      <button class="btn btn-outline btn-sm" onclick="exportCSV()">📥 CSV</button>
+    </div>
+    <div id="hist-list"><div class="empty"><div class="icon">📋</div><p>Aucun changement.</p></div></div>
+  </div>
+
+  <!-- ══════════════════ RAPPORT ══════════════════ -->
+  <div id="page-rapport" class="page">
+    <div class="card">
+      <h2>📈 Rapport SMED</h2>
+      <div class="form-group">
+        <label>Période</label>
+        <select id="rapp-periode" onchange="genRapport()">
+          <option value="7">7 derniers jours</option>
+          <option value="30" selected>30 derniers jours</option>
+          <option value="all">Tout</option>
+        </select>
+      </div>
+    </div>
+    <div id="rapport-content"><div class="empty"><div class="icon">📊</div><p>Aucune donnée disponible.</p></div></div>
+  </div>
+
+  <!-- ══════════════════ PARAMETRES ══════════════════ -->
+  <div id="page-parametres" class="page">
+    <div class="card">
+      <h2>🔗 Connexion Firebase</h2>
+      <div id="firebase-status" style="font-size:13px;padding:10px;background:var(--vert2);border-radius:8px;color:var(--vert)">✅ Connecté</div>
+      <button class="btn btn-danger btn-sm" style="margin-top:10px" onclick="deconnecterFirebase()">🔌 Changer de projet Firebase</button>
+    </div>
+
+    <div class="card">
+      <h2>🏭 Chaînes</h2>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <input type="text" id="new-chaine" placeholder="Nom de la chaîne" style="flex:1">
+        <button class="btn btn-primary btn-sm" onclick="ajouterChaine()">+</button>
+      </div>
+      <div id="liste-chaines"></div>
+    </div>
+
+    <div class="card">
+      <h2>⚙️ Machines</h2>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <input type="text" id="new-machine" placeholder="Nom de la machine" style="flex:1">
+        <button class="btn btn-primary btn-sm" onclick="ajouterMachine()">+</button>
+      </div>
+      <div id="liste-machines"></div>
+    </div>
+
+    <div class="card">
+      <h2>👷 Opérateurs</h2>
+      <div style="display:flex;gap:8px;margin-bottom:10px">
+        <input type="text" id="new-op" placeholder="Nom de l'opérateur" style="flex:1">
+        <button class="btn btn-primary btn-sm" onclick="ajouterOperateur()">+</button>
+      </div>
+      <div id="liste-ops"></div>
+    </div>
+
+    <div class="card">
+      <h2>🎯 Objectif temps (minutes)</h2>
+      <div style="display:flex;gap:8px">
+        <input type="number" id="obj-temps" placeholder="ex: 30" style="flex:1">
+        <button class="btn btn-primary btn-sm" onclick="sauvegarderObj()">💾</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>📱 Installer l'app</h2>
+      <p style="font-size:13px;color:#666;margin-bottom:12px">Sur Android : ouvre Chrome → menu ⋮ → "Ajouter à l'écran d'accueil"</p>
+      <p style="font-size:13px;color:#666">Sur iOS : Safari → partager → "Sur l'écran d'accueil"</p>
+    </div>
+  </div>
+
+</main>
+
+<!-- BOTTOM NAV -->
+<nav class="bottom-nav">
+  <button class="active" onclick="showPage('dashboard')"><span class="icon">📊</span>Tableau</button>
+  <button onclick="showPage('nouveau')"><span class="icon">▶️</span>Chrono</button>
+  <button onclick="showPage('historique')"><span class="icon">📋</span>Historique</button>
+  <button onclick="showPage('rapport')"><span class="icon">📈</span>Rapport</button>
+</nav>
+
+<!-- MODAL DETAIL -->
+<div class="modal-overlay" id="modal-detail">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="fermerModal()">✕</button>
+    <h2 id="modal-titre">Détail</h2>
+    <div id="modal-contenu"></div>
+    <div style="margin-top:16px;display:flex;gap:8px">
+      <button class="btn btn-danger btn-sm" id="modal-suppr">🗑️ Supprimer</button>
+    </div>
+  </div>
+</div>
+
+<!-- FIREBASE SDK -->
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
+import { getDatabase, ref, set, push, onValue, remove, update, get }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js";
+
+// ══════════════════════════════════════════════
+// ÉTAT GLOBAL
+// ══════════════════════════════════════════════
+let db = null;
+let fbApp = null;
+let cache = { changements:{}, config:{ chaines:[], machines:[], operateurs:[], objectif:45 } };
+let opsEnCours = [];
+let chronoMs = 0, chronoRunning = false, chronoInterval = null, chronoStart = 0;
+let deferredInstall = null;
+
+// ══════════════════════════════════════════════
+// FIREBASE INIT
+// ══════════════════════════════════════════════
+function loadFirebaseConfig() {
+  try { return JSON.parse(localStorage.getItem('smed_firebase_config')||'null'); }
+  catch(e){ return null; }
+}
+
+function parseFirebaseConfig(raw) {
+  raw = raw.trim();
+  // Supprimer le wrapper JS si présent : const firebaseConfig = {...};
+  raw = raw.replace(/^(const|var|let)\s+\w+\s*=\s*/, '');
+  raw = raw.replace(/;[\s]*$/, '').trim();
+  // Essai JSON direct
+  try { return JSON.parse(raw); } catch(e) {}
+  // Essai objet JS (clés sans guillemets)
+  try { return (new Function('return (' + raw + ')'))(); } catch(e) {}
+  throw new Error('Format non reconnu. Copie la config Firebase complète.');
+}
+
+window.initFirebaseFromSetup = function() {
+  const raw = document.getElementById('firebase-config-input').value.trim();
+  try {
+    const cfg = parseFirebaseConfig(raw);
+    if(!cfg.apiKey) throw new Error('apiKey manquant');
+    if(!cfg.databaseURL) throw new Error('databaseURL manquant — active la Realtime Database dans Firebase');
+    localStorage.setItem('smed_firebase_config', JSON.stringify(cfg));
+    document.getElementById('setup-screen').style.display = 'none';
+    document.getElementById('loading-screen').style.display = 'flex';
+    startApp(cfg);
+  } catch(e) {
+    const err = document.getElementById('setup-error');
+    err.textContent = '❌ ' + e.message;
+    err.style.display = 'block';
+  }
+};
+
+window.deconnecterFirebase = function() {
+  if(confirm('Changer de projet Firebase ? Les données locales seront effacées.')) {
+    localStorage.removeItem('smed_firebase_config');
+    location.reload();
+  }
+};
+
+function startApp(config) {
+  try {
+    fbApp = initializeApp(config);
+    db = getDatabase(fbApp);
+    setupListeners();
+    document.getElementById('loading-screen').style.display = 'none';
+    majSelectsForms();
+  } catch(e) {
+    alert('Erreur Firebase : ' + e.message);
+    document.getElementById('loading-screen').style.display = 'none';
+    document.getElementById('setup-screen').style.display = 'flex';
+  }
+}
+
+// ══════════════════════════════════════════════
+// LISTENERS TEMPS RÉEL
+// ══════════════════════════════════════════════
+function setupListeners() {
+  // Changements
+  onValue(ref(db, 'smed/changements'), snap => {
+    cache.changements = snap.val() || {};
+    majDashboard();
+    if(document.getElementById('page-historique').classList.contains('active')) filtrerHist();
+    if(document.getElementById('page-rapport').classList.contains('active')) genRapport();
+  });
+
+  // Config (chaînes, machines, opérateurs, objectif)
+  onValue(ref(db, 'smed/config'), snap => {
+    const v = snap.val();
+    if(v) {
+      cache.config.chaines = v.chaines || [];
+      cache.config.machines = v.machines || [];
+      cache.config.operateurs = v.operateurs || [];
+      cache.config.objectif = v.objectif || 45;
+    }
+    majSelectsForms();
+    majParametresListes();
+    if(document.getElementById('obj-temps')) document.getElementById('obj-temps').value = cache.config.objectif;
+  });
+
+  // Connexion
+  onValue(ref(db, '.info/connected'), snap => {
+    const online = snap.val();
+    const badge = document.getElementById('sync-badge');
+    const bar = document.getElementById('offline-bar');
+    if(online) { badge.textContent='● En ligne'; badge.className='online'; bar.style.display='none'; }
+    else { badge.textContent='● Hors ligne'; badge.className='offline'; bar.style.display='block'; }
+  });
+}
+
+function saveConfig() {
+  if(!db) return;
+  set(ref(db, 'smed/config'), cache.config);
+}
+
+// ══════════════════════════════════════════════
+// NAVIGATION
+// ══════════════════════════════════════════════
+window.showPage = function(name) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.bottom-nav button').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  const pages=['dashboard','nouveau','historique','rapport','parametres'];
+  const idx=pages.indexOf(name);
+  const btns=document.querySelectorAll('.bottom-nav button');
+  if(idx>=0 && btns[idx]) btns[idx].classList.add('active');
+  if(name==='dashboard') majDashboard();
+  if(name==='historique') filtrerHist();
+  if(name==='rapport') genRapport();
+  if(name==='parametres') majParametresListes();
+};
+
+// ══════════════════════════════════════════════
+// CHRONOMETRE
+// ══════════════════════════════════════════════
+window.startChrono = function() {
+  if(!chronoRunning){
+    chronoRunning=true;chronoStart=Date.now()-chronoMs;
+    chronoInterval=setInterval(()=>{chronoMs=Date.now()-chronoStart;document.getElementById('chrono-global').textContent=formatMs(chronoMs);},100);
+    document.getElementById('btn-start').disabled=true;
+    document.getElementById('btn-pause').disabled=false;
+    document.getElementById('btn-reset').disabled=false;
+    document.getElementById('chrono-status').textContent='🔴 En cours...';
+  }
+};
+window.pauseChrono=function(){
+  if(chronoRunning){clearInterval(chronoInterval);chronoRunning=false;
+    document.getElementById('btn-start').disabled=false;document.getElementById('btn-start').textContent='▶ Reprendre';
+    document.getElementById('btn-pause').disabled=true;document.getElementById('chrono-status').textContent='⏸ En pause';}
+};
+window.resetChrono=function(){
+  clearInterval(chronoInterval);chronoRunning=false;chronoMs=0;
+  document.getElementById('chrono-global').textContent='00:00:00';
+  document.getElementById('btn-start').disabled=false;document.getElementById('btn-start').textContent='▶ Démarrer';
+  document.getElementById('btn-pause').disabled=true;document.getElementById('btn-reset').disabled=true;
+  document.getElementById('chrono-status').textContent='Appuie sur Démarrer';
+};
+
+function formatMs(ms){const s=Math.floor(ms/1000),h=Math.floor(s/3600),m=Math.floor((s%3600)/60),sec=s%60;return`${pad(h)}:${pad(m)}:${pad(sec)}`;}
+function pad(n){return String(n).padStart(2,'0');}
+function dureeToMin(str){if(!str)return 0;const p=str.split(':');if(p.length===2)return(parseInt(p[0])||0)+(parseInt(p[1])||0)/60;return parseFloat(str)||0;}
+function minToMMSS(min){const m=Math.floor(min),s=Math.round((min-m)*60);return`${pad(m)}:${pad(s)}`;}
+function msToMin(ms){return ms/60000;}
+
+// ══════════════════════════════════════════════
+// OPERATIONS
+// ══════════════════════════════════════════════
+window.ajouterOp = function() {
+  const desc=document.getElementById('op-desc').value.trim();
+  if(!desc){alert('Décris l\'opération.');return;}
+  let duree=document.getElementById('op-duree').value.trim();
+  if(!duree){duree=minToMMSS(msToMin(chronoMs));}
+  if(!duree||duree==='00:00'){alert('Saisis une durée.');return;}
+  opsEnCours.push({id:Date.now(),desc,phase:document.getElementById('op-phase').value,type:document.getElementById('op-type').value,dureeStr:duree,dureeMin:dureeToMin(duree),obs:document.getElementById('op-obs').value.trim()});
+  document.getElementById('op-desc').value='';document.getElementById('op-duree').value='';document.getElementById('op-obs').value='';
+  majPhases();afficherOps();
+};
+
+window.supprimerOp=function(id){opsEnCours=opsEnCours.filter(o=>o.id!==id);majPhases();afficherOps();};
+
+function afficherOps(){
+  const el=document.getElementById('ops-list');
+  const cnt=document.getElementById('ops-count');
+  cnt.textContent=`(${opsEnCours.length})`;
+  if(opsEnCours.length===0){el.innerHTML='<div class="empty"><div class="icon">📝</div><p>Aucune opération.</p></div>';document.getElementById('ops-bilan').style.display='none';return;}
+  let ied=0,oed=0;
+  el.innerHTML=opsEnCours.map((op,i)=>{
+    if(op.type==='IED')ied+=op.dureeMin;else oed+=op.dureeMin;
+    return`<div class="op-item"><div class="op-info"><h4>${op.desc}</h4><p>${op.phase} · ${op.obs||'—'}</p></div><div class="op-right"><span class="badge badge-${op.type.toLowerCase()}">${op.type}</span><span class="op-duree">${op.dureeStr}</span><button class="btn btn-danger btn-sm" onclick="supprimerOp(${op.id})">✕</button></div></div>`;
+  }).join('');
+  const total=ied+oed,pct=total>0?Math.round(ied/total*100):0;
+  document.getElementById('b-ied').textContent=minToMMSS(ied);
+  document.getElementById('b-oed').textContent=minToMMSS(oed);
+  document.getElementById('b-total').textContent=minToMMSS(total);
+  document.getElementById('b-bar').style.width=pct+'%';
+  document.getElementById('b-pct').textContent=pct+'%';
+  document.getElementById('ops-bilan').style.display='block';
+}
+
+function majPhases(){
+  const phases=['Préparation','Démontage','Montage','Réglages','Production'];
+  phases.forEach((ph,i)=>{
+    const el=document.getElementById('ph-'+i);const has=opsEnCours.some(o=>o.phase===ph);
+    el.className='phase'+(has?' done':'');
+  });
+  for(let i=0;i<phases.length;i++){if(!opsEnCours.some(o=>o.phase===phases[i])){document.getElementById('ph-'+i).classList.add('active');break;}}
+}
+
+// ══════════════════════════════════════════════
+// SAUVEGARDER CHANGEMENT → FIREBASE
+// ══════════════════════════════════════════════
+window.sauvegarder = async function() {
+  const chaine=document.getElementById('f-chaine').value;
+  const machine=document.getElementById('f-machine').value;
+  const operateur=document.getElementById('f-operateur').value;
+  if(!chaine||!machine||!operateur){alert('Remplis : chaîne, machine et opérateur.');return;}
+  if(opsEnCours.length===0){alert('Enregistre au moins une opération.');return;}
+  if(!db){alert('Firebase non connecté.');return;}
+  const totalMin=opsEnCours.reduce((s,o)=>s+o.dureeMin,0);
+  const ied=opsEnCours.filter(o=>o.type==='IED').reduce((s,o)=>s+o.dureeMin,0);
+  const oed=opsEnCours.filter(o=>o.type==='OED').reduce((s,o)=>s+o.dureeMin,0);
+  const ch={
+    date:new Date().toISOString(),chaine,machine,operateur,
+    modeleAvant:document.getElementById('f-avant').value.trim()||'N/A',
+    modeleApres:document.getElementById('f-apres').value.trim()||'N/A',
+    totalMin,ied,oed,operations:opsEnCours
+  };
+  try{
+    await push(ref(db,'smed/changements'),ch);
+    opsEnCours=[];resetChrono();afficherOps();majPhases();
+    document.querySelectorAll('#page-nouveau input,#page-nouveau select').forEach(el=>{if(el.tagName==='SELECT')el.selectedIndex=0;else el.value='';});
+    alert(`✅ Changement sauvegardé !\n${minToMMSS(totalMin)} total · IED:${minToMMSS(ied)} · OED:${minToMMSS(oed)}`);
+    showPage('historique');
+  }catch(e){alert('Erreur sauvegarde : '+e.message);}
+};
+
+window.annuler=function(){if(confirm('Annuler ?')){opsEnCours=[];resetChrono();afficherOps();}};
+
+// ══════════════════════════════════════════════
+// DASHBOARD
+// ══════════════════════════════════════════════
+function majDashboard(){
+  const data=Object.values(cache.changements);
+  document.getElementById('s-total').textContent=data.length;
+  if(data.length>0){
+    const moy=data.reduce((s,c)=>s+c.totalMin,0)/data.length;
+    const max=Math.max(...data.map(c=>c.totalMin));
+    document.getElementById('s-moy').textContent=minToMMSS(moy);
+    document.getElementById('s-max').textContent=minToMMSS(max);
+    const tIED=data.reduce((s,c)=>s+c.ied,0),tAll=data.reduce((s,c)=>s+c.totalMin,0);
+    document.getElementById('s-gain').textContent=tAll>0?Math.round(tIED/tAll*50)+'%':'--%';
+    const last=[...data].sort((a,b)=>new Date(b.date)-new Date(a.date))[0];
+    if(last){
+      const d=new Date(last.date);
+      document.getElementById('dernier-ch').innerHTML=`
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div><label>Chaîne</label><p style="font-weight:700">${last.chaine}</p></div>
+          <div><label>Machine</label><p style="font-weight:700">${last.machine}</p></div>
+          <div><label>Modèle</label><p>${last.modeleAvant} → ${last.modeleApres}</p></div>
+          <div><label>Durée</label><p style="font-size:20px;font-weight:700;color:var(--bleu2)">${minToMMSS(last.totalMin)}</p></div>
+        </div>
+        <p style="font-size:11px;color:#aaa;margin-top:8px">${d.toLocaleDateString('fr-FR')} à ${d.toLocaleTimeString('fr-FR')}</p>`;
+    }
+    // IED/OED stats
+    const tIed=data.reduce((s,c)=>s+c.ied,0),tOed=data.reduce((s,c)=>s+c.oed,0),tot=tIed+tOed||1;
+    document.getElementById('ied-oed-stats').innerHTML=`
+      <div class="bilan-row">
+        <div class="bilan-chip"><div class="v" style="color:var(--rouge)">${minToMMSS(tIed)}</div><div class="l">IED total</div></div>
+        <div class="bilan-chip"><div class="v" style="color:var(--vert)">${minToMMSS(tOed)}</div><div class="l">OED total</div></div>
+        <div class="bilan-chip"><div class="v" style="color:var(--jaune)">${Math.round(tIed/tot*100)}%</div><div class="l">% IED</div></div>
+      </div>
+      <div style="margin-top:12px;background:var(--jaune2);border-radius:8px;padding:10px;font-size:12px;border-left:3px solid var(--jaune)">
+        💡 Gain potentiel SMED : <strong>${minToMMSS(tIed/2)} par changement</strong> en externalisant 50% des IED
+      </div>`;
+  }
+  dessinerChart();
+}
+
+function dessinerChart(){
+  const data=[...Object.values(cache.changements)].sort((a,b)=>new Date(a.date)-new Date(b.date)).slice(-12);
+  const ctx=document.getElementById('chartEvo').getContext('2d');
+  const W=ctx.canvas.width,H=ctx.canvas.height;
+  ctx.clearRect(0,0,W,H);
+  if(data.length<2){ctx.fillStyle='#aaa';ctx.textAlign='center';ctx.font='12px sans-serif';ctx.fillText('Pas assez de données',W/2,H/2);return;}
+  const vals=data.map(c=>c.totalMin);
+  const maxV=Math.max(...vals,cache.config.objectif||0)*1.2||1;
+  const pad=35,stepX=(W-pad*2)/(data.length-1);
+  ctx.strokeStyle='#EEF0F5';ctx.lineWidth=1;
+  for(let i=0;i<4;i++){const y=H-pad-((H-pad*2)/3)*i;ctx.beginPath();ctx.moveTo(pad,y);ctx.lineTo(W-pad,y);ctx.stroke();ctx.fillStyle='#aaa';ctx.font='9px sans-serif';ctx.textAlign='right';ctx.fillText(Math.round(maxV/3*i),pad-3,y+3);}
+  if(cache.config.objectif){const yO=H-pad-((cache.config.objectif/maxV)*(H-pad*2));ctx.strokeStyle='rgba(231,76,60,0.5)';ctx.lineWidth=1.5;ctx.setLineDash([5,3]);ctx.beginPath();ctx.moveTo(pad,yO);ctx.lineTo(W-pad,yO);ctx.stroke();ctx.setLineDash([]);ctx.fillStyle='var(--rouge)';ctx.font='9px sans-serif';ctx.textAlign='right';ctx.fillText('Obj:'+cache.config.objectif+'m',W-pad,yO-3);}
+  ctx.strokeStyle='#2E74B5';ctx.lineWidth=2.5;ctx.setLineDash([]);ctx.beginPath();
+  vals.forEach((v,i)=>{const x=pad+i*stepX,y=H-pad-((v/maxV)*(H-pad*2));if(i===0)ctx.moveTo(x,y);else ctx.lineTo(x,y);});ctx.stroke();
+  vals.forEach((v,i)=>{const x=pad+i*stepX,y=H-pad-((v/maxV)*(H-pad*2));ctx.fillStyle=v<=(cache.config.objectif||999)?'#27AE60':'#E74C3C';ctx.beginPath();ctx.arc(x,y,4,0,Math.PI*2);ctx.fill();});
+}
+
+// ══════════════════════════════════════════════
+// HISTORIQUE
+// ══════════════════════════════════════════════
+window.filtrerHist=function(){
+  const search=(document.getElementById('hist-search').value||'').toLowerCase();
+  const data=[...Object.entries(cache.changements)].map(([k,v])=>({...v,_key:k}))
+    .sort((a,b)=>new Date(b.date)-new Date(a.date))
+    .filter(c=>!search||c.chaine.toLowerCase().includes(search)||c.machine.toLowerCase().includes(search)||c.operateur.toLowerCase().includes(search));
+  const el=document.getElementById('hist-list');
+  if(data.length===0){el.innerHTML='<div class="empty"><div class="icon">📋</div><p>Aucun changement.</p></div>';return;}
+  el.innerHTML=data.map(c=>{
+    const d=new Date(c.date);
+    const color=c.totalMin<=(cache.config.objectif||999)?'var(--vert)':'var(--rouge)';
+    return`<div class="hist-item" onclick="voirDetail('${c._key}')">
+      <div class="info"><h3>🏭 ${c.chaine}</h3><p>⚙️ ${c.machine} · 👷 ${c.operateur}</p><p style="margin-top:2px">${c.modeleAvant} → ${c.modeleApres}</p></div>
+      <div class="meta"><div class="temps" style="color:${color}">${minToMMSS(c.totalMin)}</div><div class="date">${d.toLocaleDateString('fr-FR')}</div></div>
+    </div>`;
+  }).join('');
+};
+
+window.voirDetail=function(key){
+  const c={...cache.changements[key],_key:key};
+  if(!c)return;
+  const d=new Date(c.date);
+  document.getElementById('modal-titre').textContent=`📋 ${c.chaine} — ${d.toLocaleDateString('fr-FR')}`;
+  const ops=(c.operations||[]).map((op,i)=>`
+    <div class="op-item"><div class="op-info"><h4>${i+1}. ${op.desc}</h4><p>${op.phase} · ${op.obs||'—'}</p></div>
+    <div class="op-right"><span class="badge badge-${op.type.toLowerCase()}">${op.type}</span><span class="op-duree">${op.dureeStr}</span></div></div>`).join('');
+  document.getElementById('modal-contenu').innerHTML=`
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px">
+      <div><label>Chaîne</label><p>${c.chaine}</p></div><div><label>Machine</label><p>${c.machine}</p></div>
+      <div><label>Opérateur</label><p>${c.operateur}</p></div><div><label>Date</label><p>${d.toLocaleString('fr-FR')}</p></div>
+    </div>
+    <div class="bilan-row" style="margin-bottom:14px">
+      <div class="bilan-chip"><div class="v" style="color:var(--bleu)">${minToMMSS(c.totalMin)}</div><div class="l">Total</div></div>
+      <div class="bilan-chip"><div class="v" style="color:var(--rouge)">${minToMMSS(c.ied)}</div><div class="l">IED</div></div>
+      <div class="bilan-chip"><div class="v" style="color:var(--vert)">${minToMMSS(c.oed)}</div><div class="l">OED</div></div>
+    </div>
+    <div class="section-title">Opérations</div>${ops}`;
+  document.getElementById('modal-suppr').onclick=()=>supprimerCh(key);
+  document.getElementById('modal-detail').classList.add('open');
+};
+
+window.supprimerCh=async function(key){
+  if(!confirm('Supprimer ce changement ?'))return;
+  await remove(ref(db,'smed/changements/'+key));
+  fermerModal();filtrerHist();
+};
+
+window.fermerModal=function(){document.getElementById('modal-detail').classList.remove('open');};
+document.getElementById('modal-detail').addEventListener('click',function(e){if(e.target===this)fermerModal();});
+
+// ══════════════════════════════════════════════
+// RAPPORT
+// ══════════════════════════════════════════════
+window.genRapport=function(){
+  const periode=document.getElementById('rapp-periode').value;
+  let data=Object.values(cache.changements);
+  if(periode!=='all'){const j=parseInt(periode),lim=new Date();lim.setDate(lim.getDate()-j);data=data.filter(c=>new Date(c.date)>=lim);}
+  const el=document.getElementById('rapport-content');
+  if(data.length===0){el.innerHTML='<div class="empty"><div class="icon">📊</div><p>Aucune donnée.</p></div>';return;}
+  const moy=data.reduce((s,c)=>s+c.totalMin,0)/data.length;
+  const tIed=data.reduce((s,c)=>s+c.ied,0),tOed=data.reduce((s,c)=>s+c.oed,0);
+  el.innerHTML=`
+    <div class="card"><h2>📊 Résumé (${data.length} changements)</h2>
+      <div class="bilan-row">
+        <div class="bilan-chip"><div class="v" style="color:var(--bleu)">${data.length}</div><div class="l">Total</div></div>
+        <div class="bilan-chip"><div class="v" style="color:var(--bleu2)">${minToMMSS(moy)}</div><div class="l">Moyenne</div></div>
+        <div class="bilan-chip"><div class="v" style="color:var(--vert)">${minToMMSS(Math.min(...data.map(c=>c.totalMin)))}</div><div class="l">Min</div></div>
+        <div class="bilan-chip"><div class="v" style="color:var(--rouge)">${minToMMSS(Math.max(...data.map(c=>c.totalMin)))}</div><div class="l">Max</div></div>
+      </div>
+    </div>
+    <div class="card"><h2>⚙️ IED / OED</h2>
+      <div class="bilan-row" style="margin-bottom:12px">
+        <div class="bilan-chip" style="border-top:3px solid var(--rouge)"><div class="v" style="color:var(--rouge)">${minToMMSS(tIed)}</div><div class="l">IED total</div></div>
+        <div class="bilan-chip" style="border-top:3px solid var(--vert)"><div class="v" style="color:var(--vert)">${minToMMSS(tOed)}</div><div class="l">OED total</div></div>
+      </div>
+      <div style="background:var(--jaune2);border-radius:8px;padding:12px;font-size:13px;border-left:3px solid var(--jaune)">
+        💡 Gain potentiel : <strong>${minToMMSS(tIed/2)} par changement</strong> (conversion 50% IED → OED)
+      </div>
+    </div>
+    <div class="card"><h2>📋 Recommandations</h2>
+      <div class="reco-item" style="background:var(--vert2);border-left:3px solid var(--vert)">✅ Préparer les outils AVANT l'arrêt machine (externaliser IED)</div>
+      <div class="reco-item" style="background:var(--bleu3);border-left:3px solid var(--bleu2)">🔧 Créer des fiches de réglage standardisées par modèle</div>
+      <div class="reco-item" style="background:var(--jaune2);border-left:3px solid var(--jaune)">📦 Chariot de changement avec tout le nécessaire</div>
+      <div class="reco-item" style="background:var(--rouge2);border-left:3px solid var(--rouge)">⏱️ Former les opérateurs aux techniques SMED</div>
+    </div>`;
+};
+
+// ══════════════════════════════════════════════
+// PARAMETRES
+// ══════════════════════════════════════════════
+window.ajouterChaine=function(){const v=document.getElementById('new-chaine').value.trim();if(!v)return;if(!cache.config.chaines.includes(v)){cache.config.chaines.push(v);saveConfig();document.getElementById('new-chaine').value='';}};
+window.ajouterMachine=function(){const v=document.getElementById('new-machine').value.trim();if(!v)return;if(!cache.config.machines.includes(v)){cache.config.machines.push(v);saveConfig();document.getElementById('new-machine').value='';}};
+window.ajouterOperateur=function(){const v=document.getElementById('new-op').value.trim();if(!v)return;if(!cache.config.operateurs.includes(v)){cache.config.operateurs.push(v);saveConfig();document.getElementById('new-op').value='';}};
+window.supprimerItem=function(liste,val){if(!confirm(`Supprimer "${val}" ?`))return;cache.config[liste]=cache.config[liste].filter(x=>x!==val);saveConfig();};
+window.sauvegarderObj=function(){const v=parseInt(document.getElementById('obj-temps').value);if(!v||v<1)return;cache.config.objectif=v;saveConfig();alert('✅ Objectif sauvegardé : '+v+' min');};
+
+function majParametresListes(){
+  ['chaines','machines','operateurs'].forEach(lst=>{
+    const el=document.getElementById('liste-'+lst);
+    if(!el)return;
+    el.innerHTML=cache.config[lst].map(v=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #eee"><span>${v}</span><button class="btn btn-danger btn-sm" onclick="supprimerItem('${lst}','${v}')">✕</button></div>`).join('')||'<p style="color:#aaa;font-size:12px">Aucun élément.</p>';
+  });
+}
+
+function majSelectsForms(){
+  const fChaine=document.getElementById('f-chaine');
+  const fMachine=document.getElementById('f-machine');
+  const fOp=document.getElementById('f-operateur');
+  if(fChaine)fChaine.innerHTML='<option value="">-- Sélectionner --</option>'+cache.config.chaines.map(c=>`<option>${c}</option>`).join('');
+  if(fMachine)fMachine.innerHTML='<option value="">-- Sélectionner --</option>'+cache.config.machines.map(m=>`<option>${m}</option>`).join('');
+  if(fOp)fOp.innerHTML='<option value="">-- Sélectionner --</option>'+cache.config.operateurs.map(o=>`<option>${o}</option>`).join('');
+}
+
+// ══════════════════════════════════════════════
+// EXPORT CSV
+// ══════════════════════════════════════════════
+window.exportCSV=function(){
+  const data=Object.values(cache.changements);
+  if(data.length===0){alert('Aucune donnée.');return;}
+  const h=['Date','Chaîne','Machine','Opérateur','Avant','Après','Total(min)','IED(min)','OED(min)'];
+  const rows=data.map(c=>[new Date(c.date).toLocaleString('fr-FR'),c.chaine,c.machine,c.operateur,c.modeleAvant,c.modeleApres,c.totalMin.toFixed(1),c.ied.toFixed(1),c.oed.toFixed(1)]);
+  const csv=[h,...rows].map(r=>r.map(v=>`"${v}"`).join(';')).join('\n');
+  const a=document.createElement('a');a.href='data:text/csv;charset=utf-8,﻿'+encodeURIComponent(csv);a.download='SMED_MDC_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+};
+
+// ══════════════════════════════════════════════
+// PWA INSTALL
+// ══════════════════════════════════════════════
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstall=e;document.getElementById('install-banner').style.display='block';});
+window.installApp=function(){if(deferredInstall){deferredInstall.prompt();deferredInstall.userChoice.then(()=>{deferredInstall=null;document.getElementById('install-banner').style.display='none';});}};
+
+// SERVICE WORKER
+if('serviceWorker' in navigator){navigator.serviceWorker.register('./sw.js').catch(()=>{});}
+
+// ══════════════════════════════════════════════
+// DÉMARRAGE
+// ══════════════════════════════════════════════
+const savedConfig = loadFirebaseConfig();
+if(savedConfig){
+  startApp(savedConfig);
+} else {
+  document.getElementById('loading-screen').style.display='none';
+  document.getElementById('setup-screen').style.display='flex';
+}
+</script>
+</body>
+</html>
