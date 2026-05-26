@@ -2,7 +2,7 @@
   "name": "SMED Manager — MDC Confection",
   "short_name": "SMED MDC",
   "description": "Gestion des changements de série par méthode SMED",
-  "start_url": "./index.html",
+  "start_url": "https://jacku8501-art.github.io/smed/",
   "display": "standalone",
   "background_color": "#1F3864",
   "theme_color": "#1F3864",
@@ -21,6 +21,9 @@
       "purpose": "any maskable"
     }
   ],
-  "categories": ["productivity", "business"],
+  "categories": [
+    "productivity",
+    "business"
+  ],
   "lang": "fr"
 }
