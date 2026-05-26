@@ -289,9 +289,29 @@ const firebaseConfig = { apiKey: "AIza...", ... };'></textarea>
       <div class="form-group"><label>Chaîne / Ligne</label><select id="f-chaine"><option value="">-- Sélectionner --</option></select></div>
       <div class="form-group"><label>Machine</label><select id="f-machine"><option value="">-- Sélectionner --</option></select></div>
       <div class="form-group"><label>Opérateur</label><select id="f-operateur"><option value="">-- Sélectionner --</option></select></div>
-      <div class="form-group"><label>Modèle avant</label><input type="text" id="f-avant" placeholder="ex: Pantalon A204"></div>
-      <div class="form-group"><label>Nouveau modèle</label><input type="text" id="f-apres" placeholder="ex: Pantalon B310"></div>
     </div>
+
+    <!-- GAMME SELECTOR -->
+    <div class="card" style="border:2px solid var(--bleu3)">
+      <h2>📋 Gammes de montage</h2>
+      <div class="form-group">
+        <label>Modèle précédent</label>
+        <select id="g-avant" onchange="majNomModele()">
+          <option value="">-- Sélectionner la gamme --</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label>Nouveau modèle</label>
+        <select id="g-apres" onchange="majNomModele()">
+          <option value="">-- Sélectionner la gamme --</option>
+        </select>
+      </div>
+      <button class="btn btn-primary btn-block" onclick="chargerGamme()">📥 Charger les opérations des deux modèles</button>
+      <p class="tip" style="margin-top:8px">Ou ajoute les opérations manuellement ci-dessous</p>
+    </div>
+
+    <input type="hidden" id="f-avant">
+    <input type="hidden" id="f-apres">
 
     <div class="phases" id="phases-bar">
       <div class="phase active" id="ph-0"><span class="num">①</span>Prép.</div>
@@ -374,6 +394,38 @@ const firebaseConfig = { apiKey: "AIza...", ... };'></textarea>
     <div id="rapport-content"><div class="empty"><div class="icon">📊</div><p>Aucune donnée disponible.</p></div></div>
   </div>
 
+  <!-- ══════════════════ GAMMES ══════════════════ -->
+  <div id="page-gammes" class="page">
+
+    <!-- IMPORT EXCEL -->
+    <div class="card" style="border:2px solid var(--vert);background:var(--vert2)">
+      <h2 style="color:var(--vert)">📥 Importer depuis Excel</h2>
+      <p style="font-size:13px;color:#555;margin-bottom:12px">
+        Importe tes gammes directement depuis tes fichiers Excel. Chaque feuille devient une gamme. Une seule fois suffit — les données sont sauvegardées dans Firebase.
+      </p>
+      <input type="file" id="excel-import-input" accept=".xlsx,.xls" style="display:none" onchange="ouvrirImportExcel(this)">
+      <button class="btn btn-success btn-block" onclick="document.getElementById('excel-import-input').click()">
+        📂 Sélectionner un fichier Excel (.xlsx)
+      </button>
+    </div>
+
+    <!-- CRÉER MANUELLEMENT -->
+    <div class="card">
+      <h2>✏️ Créer une gamme manuellement</h2>
+      <div class="form-group">
+        <label>Nom du modèle</label>
+        <input type="text" id="g-nom" placeholder="ex: Pantalon A204 — Chaîne 1">
+      </div>
+      <div class="form-group">
+        <label>Description (optionnel)</label>
+        <input type="text" id="g-desc" placeholder="ex: Pantalon coupe droite, fermeture éclair">
+      </div>
+      <button class="btn btn-primary btn-block" onclick="creerGamme()">+ Créer cette gamme</button>
+    </div>
+
+    <div id="gammes-list"><div class="empty"><div class="icon">📋</div><p>Aucune gamme. Importe depuis Excel ou crée manuellement.</p></div></div>
+  </div>
+
   <!-- ══════════════════ PARAMETRES ══════════════════ -->
   <div id="page-parametres" class="page">
     <div class="card">
@@ -430,9 +482,66 @@ const firebaseConfig = { apiKey: "AIza...", ... };'></textarea>
 <nav class="bottom-nav">
   <button class="active" onclick="showPage('dashboard')"><span class="icon">📊</span>Tableau</button>
   <button onclick="showPage('nouveau')"><span class="icon">▶️</span>Chrono</button>
-  <button onclick="showPage('historique')"><span class="icon">📋</span>Historique</button>
+  <button onclick="showPage('gammes')"><span class="icon">📋</span>Gammes</button>
+  <button onclick="showPage('historique')"><span class="icon">🕐</span>Historique</button>
   <button onclick="showPage('rapport')"><span class="icon">📈</span>Rapport</button>
 </nav>
+
+<!-- MODAL IMPORT EXCEL -->
+<div class="modal-overlay" id="modal-import">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <button class="modal-close" onclick="fermerModalImport()">✕</button>
+    <h2>📥 Importer depuis Excel</h2>
+
+    <!-- ÉTAPE 1 : Sélection feuilles -->
+    <div id="import-step1">
+      <p style="font-size:13px;color:#666;margin-bottom:14px">Sélectionne les feuilles à importer. Chaque feuille deviendra une gamme.</p>
+      <div id="import-sheets-list"></div>
+      <button class="btn btn-primary btn-block" style="margin-top:14px" onclick="importStep2()">Suivant →</button>
+    </div>
+
+    <!-- ÉTAPE 2 : Mapping colonnes -->
+    <div id="import-step2" style="display:none">
+      <p style="font-size:13px;color:#666;margin-bottom:10px">Dis-moi quelle colonne correspond à quoi dans ton fichier Excel :</p>
+      <div id="import-preview-header" style="background:var(--gris);border-radius:8px;padding:10px;font-size:11px;font-family:monospace;margin-bottom:14px;overflow-x:auto;white-space:nowrap"></div>
+      <div class="form-group">
+        <label>Colonne — Description de l'opération *</label>
+        <select id="map-desc"></select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div class="form-group">
+          <label>Colonne — Phase</label>
+          <select id="map-phase"><option value="">— Ignorer —</option></select>
+        </div>
+        <div class="form-group">
+          <label>Colonne — Type (IED/OED)</label>
+          <select id="map-type"><option value="">— Ignorer —</option></select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Colonne — Temps standard (mm:ss ou secondes)</label>
+        <select id="map-temps"><option value="">— Ignorer —</option></select>
+      </div>
+      <div style="background:var(--jaune2);border-radius:8px;padding:10px;font-size:12px;margin-bottom:14px">
+        💡 Si la colonne Phase est vide, toutes les opérations seront en "Démontage/Montage". Si Type est vide, elles seront classées IED par défaut.
+      </div>
+      <div style="display:flex;gap:8px">
+        <button class="btn btn-outline" onclick="importStep1()">← Retour</button>
+        <button class="btn btn-primary" style="flex:1" onclick="importStep3()">Voir l'aperçu →</button>
+      </div>
+    </div>
+
+    <!-- ÉTAPE 3 : Aperçu et confirmation -->
+    <div id="import-step3" style="display:none">
+      <div id="import-preview"></div>
+      <div style="display:flex;gap:8px;margin-top:14px">
+        <button class="btn btn-outline" onclick="importStep2()">← Retour</button>
+        <button class="btn btn-success" style="flex:1" id="btn-confirmer-import" onclick="confirmerImport()">✅ Importer dans Firebase</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <!-- MODAL DETAIL -->
 <div class="modal-overlay" id="modal-detail">
@@ -447,6 +556,9 @@ const firebaseConfig = { apiKey: "AIza...", ... };'></textarea>
   </div>
 </div>
 
+<!-- SHEETJS pour lire Excel -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+
 <!-- FIREBASE SDK -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
@@ -458,8 +570,9 @@ import { getDatabase, ref, set, push, onValue, remove, update, get }
 // ══════════════════════════════════════════════
 let db = null;
 let fbApp = null;
-let cache = { changements:{}, config:{ chaines:[], machines:[], operateurs:[], objectif:45 } };
+let cache = { changements:{}, config:{ chaines:[], machines:[], operateurs:[], objectif:45 }, gammes:{} };
 let opsEnCours = [];
+let gammeEditionId = null; // ID de la gamme en cours d'édition
 let chronoMs = 0, chronoRunning = false, chronoInterval = null, chronoStart = 0;
 let deferredInstall = null;
 
@@ -547,6 +660,13 @@ function setupListeners() {
     if(document.getElementById('obj-temps')) document.getElementById('obj-temps').value = cache.config.objectif;
   });
 
+  // Gammes
+  onValue(ref(db, 'smed/gammes'), snap => {
+    cache.gammes = snap.val() || {};
+    majSelectsGammes();
+    if(document.getElementById('page-gammes').classList.contains('active')) afficherGammes();
+  });
+
   // Connexion
   onValue(ref(db, '.info/connected'), snap => {
     const online = snap.val();
@@ -576,6 +696,7 @@ window.showPage = function(name) {
   if(name==='dashboard') majDashboard();
   if(name==='historique') filtrerHist();
   if(name==='rapport') genRapport();
+  if(name==='gammes') afficherGammes();
   if(name==='parametres') majParametresListes();
 };
 
@@ -626,25 +747,6 @@ window.ajouterOp = function() {
 };
 
 window.supprimerOp=function(id){opsEnCours=opsEnCours.filter(o=>o.id!==id);majPhases();afficherOps();};
-
-function afficherOps(){
-  const el=document.getElementById('ops-list');
-  const cnt=document.getElementById('ops-count');
-  cnt.textContent=`(${opsEnCours.length})`;
-  if(opsEnCours.length===0){el.innerHTML='<div class="empty"><div class="icon">📝</div><p>Aucune opération.</p></div>';document.getElementById('ops-bilan').style.display='none';return;}
-  let ied=0,oed=0;
-  el.innerHTML=opsEnCours.map((op,i)=>{
-    if(op.type==='IED')ied+=op.dureeMin;else oed+=op.dureeMin;
-    return`<div class="op-item"><div class="op-info"><h4>${op.desc}</h4><p>${op.phase} · ${op.obs||'—'}</p></div><div class="op-right"><span class="badge badge-${op.type.toLowerCase()}">${op.type}</span><span class="op-duree">${op.dureeStr}</span><button class="btn btn-danger btn-sm" onclick="supprimerOp(${op.id})">✕</button></div></div>`;
-  }).join('');
-  const total=ied+oed,pct=total>0?Math.round(ied/total*100):0;
-  document.getElementById('b-ied').textContent=minToMMSS(ied);
-  document.getElementById('b-oed').textContent=minToMMSS(oed);
-  document.getElementById('b-total').textContent=minToMMSS(total);
-  document.getElementById('b-bar').style.width=pct+'%';
-  document.getElementById('b-pct').textContent=pct+'%';
-  document.getElementById('ops-bilan').style.display='block';
-}
 
 function majPhases(){
   const phases=['Préparation','Démontage','Montage','Réglages','Production'];
@@ -855,7 +957,407 @@ function majSelectsForms(){
   if(fChaine)fChaine.innerHTML='<option value="">-- Sélectionner --</option>'+cache.config.chaines.map(c=>`<option>${c}</option>`).join('');
   if(fMachine)fMachine.innerHTML='<option value="">-- Sélectionner --</option>'+cache.config.machines.map(m=>`<option>${m}</option>`).join('');
   if(fOp)fOp.innerHTML='<option value="">-- Sélectionner --</option>'+cache.config.operateurs.map(o=>`<option>${o}</option>`).join('');
+  majSelectsGammes();
 }
+
+// ══════════════════════════════════════════════
+// GAMMES DE MONTAGE
+// ══════════════════════════════════════════════
+
+function majSelectsGammes() {
+  const opts = '<option value="">-- Sans gamme --</option>' +
+    Object.entries(cache.gammes).map(([k,g])=>`<option value="${k}">${g.nom}</option>`).join('');
+  ['g-avant','g-apres'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) { const cur=el.value; el.innerHTML=opts; el.value=cur; }
+  });
+}
+
+window.majNomModele = function() {
+  const gAvant = cache.gammes[document.getElementById('g-avant').value];
+  const gApres = cache.gammes[document.getElementById('g-apres').value];
+  document.getElementById('f-avant').value = gAvant ? gAvant.nom : '';
+  document.getElementById('f-apres').value = gApres ? gApres.nom : '';
+};
+
+window.chargerGamme = function() {
+  const idAvant = document.getElementById('g-avant').value;
+  const idApres = document.getElementById('g-apres').value;
+  if(!idAvant && !idApres) { alert('Sélectionne au moins une gamme.'); return; }
+  if(!confirm('Charger les opérations ? Les opérations déjà saisies seront remplacées.')) return;
+
+  opsEnCours = [];
+  const ajouter = (gamme, label) => {
+    if(!gamme || !gamme.operations) return;
+    gamme.operations.forEach(op => {
+      opsEnCours.push({
+        id: Date.now() + Math.random(),
+        desc: op.desc,
+        phase: op.phase,
+        type: op.type,
+        dureeStr: '',   // à saisir par l'opérateur
+        dureeMin: 0,
+        obs: op.obs || '',
+        fromGamme: label,
+        tempsStd: op.tempsStd || ''
+      });
+    });
+  };
+
+  if(idAvant) ajouter(cache.gammes[idAvant], cache.gammes[idAvant].nom);
+  if(idApres) ajouter(cache.gammes[idApres], cache.gammes[idApres].nom);
+
+  majNomModele();
+  majPhases();
+  afficherOps();
+  alert(`✅ ${opsEnCours.length} opérations chargées.\nSaisis le temps pour chaque opération.`);
+};
+
+// Afficher les ops avec saisie de temps pour les ops sans durée
+function afficherOps() {
+  const el = document.getElementById('ops-list');
+  const cnt = document.getElementById('ops-count');
+  cnt.textContent = `(${opsEnCours.length})`;
+  if(opsEnCours.length === 0) {
+    el.innerHTML = '<div class="empty"><div class="icon">📝</div><p>Aucune opération.</p></div>';
+    document.getElementById('ops-bilan').style.display = 'none';
+    return;
+  }
+  let ied=0, oed=0;
+  el.innerHTML = opsEnCours.map((op, i) => {
+    if(op.dureeMin) { if(op.type==='IED') ied+=op.dureeMin; else oed+=op.dureeMin; }
+    const timeInput = op.dureeStr
+      ? `<span class="op-duree" onclick="editerTemps(${i})" style="cursor:pointer" title="Appuie pour modifier">${op.dureeStr}</span>`
+      : `<input type="text" placeholder="${op.tempsStd||'mm:ss'}" maxlength="5" inputmode="numeric"
+           style="width:72px;padding:6px 8px;border:2px solid var(--bleu2);border-radius:7px;font-size:14px;font-weight:700;text-align:center;background:var(--bleu3);"
+           onblur="enregistrerTemps(${i}, this.value)" onkeydown="if(event.key==='Enter'){this.blur();}">`;
+    return `<div class="op-item" id="op-item-${i}">
+      <div class="op-info">
+        <h4>${op.desc}</h4>
+        <p>${op.phase} ${op.fromGamme ? '· <em style="color:var(--bleu2)">'+op.fromGamme+'</em>' : ''} ${op.obs?'· '+op.obs:''}</p>
+      </div>
+      <div class="op-right">
+        <span class="badge badge-${op.type.toLowerCase()}">${op.type}</span>
+        ${timeInput}
+        <button class="btn btn-danger btn-sm" onclick="supprimerOp(${op.id})" style="padding:4px 8px">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Recalcul bilan avec toutes les durées saisies
+  opsEnCours.forEach(op => {
+    if(op.type==='IED') ied+=op.dureeMin; else oed+=op.dureeMin;
+  });
+  // Éviter double compte (déjà fait dans la boucle map)
+  // Recalcul propre :
+  ied=0; oed=0;
+  opsEnCours.forEach(op=>{ if(op.type==='IED') ied+=op.dureeMin; else oed+=op.dureeMin; });
+  const total=ied+oed, pct=total>0?Math.round(ied/total*100):0;
+  document.getElementById('b-ied').textContent=minToMMSS(ied);
+  document.getElementById('b-oed').textContent=minToMMSS(oed);
+  document.getElementById('b-total').textContent=minToMMSS(total);
+  document.getElementById('b-bar').style.width=pct+'%';
+  document.getElementById('b-pct').textContent=pct+'%';
+  document.getElementById('ops-bilan').style.display='block';
+}
+
+window.enregistrerTemps = function(i, val) {
+  if(!val||!val.includes(':')) return;
+  opsEnCours[i].dureeStr = val;
+  opsEnCours[i].dureeMin = dureeToMin(val);
+  afficherOps();
+};
+
+window.editerTemps = function(i) {
+  opsEnCours[i].dureeStr = '';
+  opsEnCours[i].dureeMin = 0;
+  afficherOps();
+  // Focus sur le nouvel input
+  setTimeout(() => {
+    const inputs = document.querySelectorAll('#ops-list input[type=text]');
+    if(inputs[i]) inputs[i].focus();
+  }, 50);
+};
+
+// ── CRÉER UNE GAMME ──
+window.creerGamme = async function() {
+  const nom = document.getElementById('g-nom').value.trim();
+  if(!nom) { alert('Saisis un nom de modèle.'); return; }
+  if(!db) { alert('Firebase non connecté.'); return; }
+  const gamme = { nom, desc: document.getElementById('g-desc').value.trim(), operations: [] };
+  const ref_ = await push(ref(db, 'smed/gammes'), gamme);
+  document.getElementById('g-nom').value = '';
+  document.getElementById('g-desc').value = '';
+  gammeEditionId = ref_.key;
+  afficherGammes();
+  alert(`✅ Gamme "${nom}" créée ! Ajoute maintenant ses opérations.`);
+};
+
+window.supprimerGamme = async function(key) {
+  const g = cache.gammes[key];
+  if(!confirm(`Supprimer la gamme "${g.nom}" ?`)) return;
+  await remove(ref(db, 'smed/gammes/' + key));
+  if(gammeEditionId === key) gammeEditionId = null;
+  afficherGammes();
+};
+
+// ── OPERATIONS D'UNE GAMME ──
+window.ajouterOpGamme = async function(gammeKey) {
+  const desc = document.getElementById('go-desc-'+gammeKey).value.trim();
+  if(!desc) { alert('Décris l\'opération.'); return; }
+  const op = {
+    desc,
+    phase: document.getElementById('go-phase-'+gammeKey).value,
+    type: document.getElementById('go-type-'+gammeKey).value,
+    tempsStd: document.getElementById('go-std-'+gammeKey).value.trim(),
+    obs: ''
+  };
+  const gamme = cache.gammes[gammeKey];
+  const ops = gamme.operations || [];
+  ops.push(op);
+  await update(ref(db, 'smed/gammes/' + gammeKey), { operations: ops });
+  document.getElementById('go-desc-'+gammeKey).value = '';
+  document.getElementById('go-std-'+gammeKey).value = '';
+};
+
+window.supprimerOpGamme = async function(gammeKey, idx) {
+  const gamme = cache.gammes[gammeKey];
+  const ops = [...(gamme.operations || [])];
+  ops.splice(idx, 1);
+  await update(ref(db, 'smed/gammes/' + gammeKey), { operations: ops });
+};
+
+// ── AFFICHER LES GAMMES ──
+function afficherGammes() {
+  const el = document.getElementById('gammes-list');
+  const gammes = Object.entries(cache.gammes);
+  if(gammes.length === 0) {
+    el.innerHTML = '<div class="empty"><div class="icon">📋</div><p>Aucune gamme. Crée ta première gamme ci-dessus.</p></div>';
+    return;
+  }
+  el.innerHTML = gammes.map(([key, g]) => {
+    const ops = g.operations || [];
+    const isOpen = gammeEditionId === key;
+    const opsHtml = isOpen ? `
+      <div style="margin-top:12px">
+        <div class="section-title">Opérations (${ops.length})</div>
+        ${ops.map((op,i) => `
+          <div class="op-item" style="margin-bottom:6px">
+            <div class="op-info">
+              <h4>${op.desc}</h4>
+              <p>${op.phase} ${op.tempsStd?'· Tps std: <strong>'+op.tempsStd+'</strong>':''}</p>
+            </div>
+            <div class="op-right">
+              <span class="badge badge-${op.type.toLowerCase()}">${op.type}</span>
+              <button class="btn btn-danger btn-sm" onclick="supprimerOpGamme('${key}',${i})">✕</button>
+            </div>
+          </div>`).join('')}
+        ${ops.length===0?'<p style="color:#aaa;font-size:12px;margin-bottom:10px">Aucune opération. Ajoute-en ci-dessous.</p>':''}
+        <div style="background:var(--gris);border-radius:10px;padding:12px;margin-top:10px">
+          <div class="form-group"><label>Description</label><input type="text" id="go-desc-${key}" placeholder="ex: Démonter le guide-fil droit"></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">
+            <div><label>Phase</label><select id="go-phase-${key}"><option>Préparation</option><option>Démontage</option><option>Montage</option><option>Réglages</option><option>Production</option></select></div>
+            <div><label>Type</label><select id="go-type-${key}"><option value="IED">IED</option><option value="OED">OED</option></select></div>
+          </div>
+          <div class="form-group"><label>Temps standard (mm:ss) — optionnel</label><input type="text" id="go-std-${key}" placeholder="ex: 02:30" maxlength="5" inputmode="numeric"></div>
+          <button class="btn btn-primary btn-block" onclick="ajouterOpGamme('${key}')">+ Ajouter l'opération</button>
+        </div>
+        <button class="btn btn-outline btn-block" style="margin-top:8px" onclick="gammeEditionId=null;afficherGammes()">✅ Terminer l'édition</button>
+      </div>` : '';
+
+    return `<div class="card" style="border-left:4px solid var(--bleu2)">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <h3 style="font-size:15px;color:var(--bleu);font-weight:700">${g.nom}</h3>
+          ${g.desc?`<p style="font-size:12px;color:#888">${g.desc}</p>`:''}
+          <p style="font-size:12px;color:var(--bleu2);margin-top:4px">📋 ${ops.length} opération${ops.length>1?'s':''}</p>
+        </div>
+        <div style="display:flex;gap:6px">
+          <button class="btn btn-outline btn-sm" onclick="gammeEditionId='${key}';afficherGammes()">✏️ Éditer</button>
+          <button class="btn btn-danger btn-sm" onclick="supprimerGamme('${key}')">🗑️</button>
+        </div>
+      </div>
+      ${opsHtml}
+    </div>`;
+  }).join('');
+}
+
+// ══════════════════════════════════════════════
+// IMPORT EXCEL
+// ══════════════════════════════════════════════
+let importWorkbook = null;
+let importSheetsSelectionnes = [];
+let importHeaders = [];
+let importDataParFeuille = {};
+
+window.ouvrirImportExcel = function(input) {
+  const file = input.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      importWorkbook = XLSX.read(e.target.result, { type: 'array' });
+      input.value = '';
+      importStep1();
+      document.getElementById('modal-import').classList.add('open');
+    } catch(err) {
+      alert('Erreur lecture Excel : ' + err.message);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+};
+
+function importStep1() {
+  document.getElementById('import-step1').style.display='block';
+  document.getElementById('import-step2').style.display='none';
+  document.getElementById('import-step3').style.display='none';
+
+  const sheets = importWorkbook.SheetNames;
+  document.getElementById('import-sheets-list').innerHTML = sheets.map((s,i) => {
+    const ws = importWorkbook.Sheets[s];
+    const data = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+    const nbLignes = Math.max(0, data.filter(r=>r.some(c=>c!=='')).length - 1);
+    return `<label style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--gris);border-radius:8px;margin-bottom:8px;cursor:pointer">
+      <input type="checkbox" id="sheet-${i}" value="${s}" checked style="width:auto;transform:scale(1.3)">
+      <div>
+        <strong>${s}</strong>
+        <span style="font-size:11px;color:#888;margin-left:6px">${nbLignes} lignes</span>
+      </div>
+    </label>`;
+  }).join('');
+}
+
+window.importStep2 = function() {
+  importSheetsSelectionnes = importWorkbook.SheetNames
+    .filter((s,i) => document.getElementById('sheet-'+i)?.checked);
+  if(importSheetsSelectionnes.length === 0) { alert('Sélectionne au moins une feuille.'); return; }
+
+  // Prendre les headers de la première feuille sélectionnée
+  const ws = importWorkbook.Sheets[importSheetsSelectionnes[0]];
+  const data = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+  // Chercher la première ligne non vide = headers
+  const headerRow = data.find(r => r.some(c => String(c).trim() !== '')) || [];
+  importHeaders = headerRow.map((h,i) => ({ idx:i, label: String(h).trim() || `Colonne ${i+1}` }));
+
+  // Aperçu des 3 premières lignes
+  const preview = data.filter(r=>r.some(c=>c!=='')).slice(0,4);
+  document.getElementById('import-preview-header').textContent =
+    preview.map(r => r.slice(0,8).map(c=>String(c).substring(0,12).padEnd(13)).join('|')).join('\n');
+
+  // Remplir les selects de mapping
+  const opts = importHeaders.map(h => `<option value="${h.idx}">${h.label}</option>`).join('');
+  const optsOptional = '<option value="">— Ignorer —</option>' + opts;
+  document.getElementById('map-desc').innerHTML = opts;
+  document.getElementById('map-phase').innerHTML = optsOptional;
+  document.getElementById('map-type').innerHTML = optsOptional;
+  document.getElementById('map-temps').innerHTML = optsOptional;
+
+  // Auto-detect colonnes courantes
+  importHeaders.forEach(h => {
+    const l = h.label.toLowerCase();
+    if(l.includes('opérat')||l.includes('operat')||l.includes('description')||l.includes('tâche')||l.includes('poste')) document.getElementById('map-desc').value = h.idx;
+    if(l.includes('phase')||l.includes('étape')) document.getElementById('map-phase').value = h.idx;
+    if(l.includes('ied')||l.includes('oed')||l.includes('type')||l.includes('interne')||l.includes('externe')) document.getElementById('map-type').value = h.idx;
+    if(l.includes('temps')||l.includes('durée')||l.includes('time')||l.includes('tps')) document.getElementById('map-temps').value = h.idx;
+  });
+
+  document.getElementById('import-step1').style.display='none';
+  document.getElementById('import-step2').style.display='block';
+  document.getElementById('import-step3').style.display='none';
+};
+
+window.importStep1 = function() {
+  document.getElementById('import-step1').style.display='block';
+  document.getElementById('import-step2').style.display='none';
+  document.getElementById('import-step3').style.display='none';
+};
+
+window.importStep3 = function() {
+  const colDesc = parseInt(document.getElementById('map-desc').value);
+  const colPhase = document.getElementById('map-phase').value;
+  const colType = document.getElementById('map-type').value;
+  const colTemps = document.getElementById('map-temps').value;
+
+  importDataParFeuille = {};
+  let totalOps = 0;
+
+  importSheetsSelectionnes.forEach(sheetName => {
+    const ws = importWorkbook.Sheets[sheetName];
+    const data = XLSX.utils.sheet_to_json(ws, {header:1, defval:''});
+    const rows = data.filter(r=>r.some(c=>c!==''));
+    // Ignorer la ligne d'en-tête (première ligne)
+    const dataRows = rows.slice(1).filter(r => String(r[colDesc]||'').trim() !== '');
+
+    importDataParFeuille[sheetName] = dataRows.map(r => {
+      const typeRaw = colType !== '' ? String(r[parseInt(colType)]||'').toUpperCase() : '';
+      const type = typeRaw.includes('OED') ? 'OED' : 'IED';
+      const phaseRaw = colPhase !== '' ? String(r[parseInt(colPhase)]||'').trim() : '';
+      const phase = phaseRaw || (type === 'IED' ? 'Démontage' : 'Préparation');
+      const tempsRaw = colTemps !== '' ? r[parseInt(colTemps)] : '';
+      let tempsStd = '';
+      if(tempsRaw) {
+        const n = parseFloat(tempsRaw);
+        if(!isNaN(n)) {
+          // Si > 100 = secondes, convertir en mm:ss
+          if(n > 100) { const m=Math.floor(n/60),s=Math.round(n%60); tempsStd=`${pad(m)}:${pad(s)}`; }
+          else tempsStd = String(tempsRaw).trim();
+        } else tempsStd = String(tempsRaw).trim();
+      }
+      return { desc: String(r[colDesc]).trim(), phase, type, tempsStd, obs:'' };
+    });
+    totalOps += importDataParFeuille[sheetName].length;
+  });
+
+  // Aperçu
+  const previewHtml = importSheetsSelectionnes.map(sheet => {
+    const ops = importDataParFeuille[sheet];
+    const sample = ops.slice(0,5);
+    return `<div style="margin-bottom:14px">
+      <div style="font-weight:700;color:var(--bleu);margin-bottom:6px">📋 ${sheet} (${ops.length} opérations)</div>
+      ${sample.map(op=>`<div class="op-item" style="margin-bottom:4px">
+        <div class="op-info"><h4 style="font-size:12px">${op.desc}</h4><p>${op.phase} ${op.tempsStd?'· std: '+op.tempsStd:''}</p></div>
+        <span class="badge badge-${op.type.toLowerCase()}">${op.type}</span>
+      </div>`).join('')}
+      ${ops.length>5?`<p style="font-size:11px;color:#aaa;text-align:center">... et ${ops.length-5} autres opérations</p>`:''}
+    </div>`;
+  }).join('');
+
+  document.getElementById('import-preview').innerHTML = `
+    <div style="background:var(--vert2);border-radius:8px;padding:12px;margin-bottom:14px;font-size:13px">
+      ✅ <strong>${importSheetsSelectionnes.length} gamme(s)</strong> · <strong>${totalOps} opérations</strong> prêtes à importer
+    </div>${previewHtml}`;
+
+  document.getElementById('import-step1').style.display='none';
+  document.getElementById('import-step2').style.display='none';
+  document.getElementById('import-step3').style.display='block';
+};
+
+window.confirmerImport = async function() {
+  if(!db) { alert('Firebase non connecté.'); return; }
+  const btn = document.getElementById('btn-confirmer-import');
+  btn.disabled = true; btn.textContent = '⏳ Import en cours...';
+  try {
+    for(const sheetName of importSheetsSelectionnes) {
+      const ops = importDataParFeuille[sheetName];
+      await push(ref(db, 'smed/gammes'), {
+        nom: sheetName,
+        desc: `Importé depuis Excel`,
+        operations: ops
+      });
+    }
+    fermerModalImport();
+    showPage('gammes');
+    alert(`✅ Import terminé !\n${importSheetsSelectionnes.length} gamme(s) créée(s) dans Firebase.\nElles sont disponibles sur tous tes appareils.`);
+  } catch(e) {
+    alert('Erreur import : ' + e.message);
+  }
+  btn.disabled = false; btn.textContent = '✅ Importer dans Firebase';
+};
+
+window.fermerModalImport = function() {
+  document.getElementById('modal-import').classList.remove('open');
+};
+document.getElementById('modal-import').addEventListener('click', function(e){if(e.target===this)fermerModalImport();});
 
 // ══════════════════════════════════════════════
 // EXPORT CSV
